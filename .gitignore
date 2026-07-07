@@ -1,13 +1,35 @@
+# Local environments
 .venv/
 venv/
 obs_env/
+.env
 
+# Python caches
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
 
+# Runtime files
 config.json
 app_control.json
 
+# PyInstaller / local build output
 build/
 dist/
+*.spec.bak
+
+# Installer output
+installer/output/
+*.iss.bak
+
+# Local app branding asset
+assets/app.ico
+
+# Local/editor files
+.agents/
+.vscode/
+.idea/
+*.log
+
+# Legacy reference implementation kept locally
 legacy/

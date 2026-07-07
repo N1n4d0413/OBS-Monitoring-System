@@ -12,6 +12,7 @@ from typing import Any
 import obsws_python as obs
 
 from src.utils.logger import log
+from src.utils.paths import runtime_file
 from src.vision.camera import get_available_cameras, test_camera
 
 
@@ -27,8 +28,8 @@ class ConfigManager:
         "camera_index",
     )
 
-    def __init__(self, config_path: str | Path = "config.json") -> None:
-        self.config_path = Path(config_path)
+    def __init__(self, config_path: str | Path | None = None) -> None:
+        self.config_path = Path(config_path) if config_path is not None else runtime_file("config.json")
 
     def load(self) -> dict[str, Any]:
         """Load an existing config or create a new one through the setup wizard."""

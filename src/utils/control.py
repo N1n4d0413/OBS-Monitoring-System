@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from src.utils.logger import log
+from src.utils.paths import runtime_file
 
 
 @dataclass(frozen=True)
@@ -24,8 +25,8 @@ class ControlCommand:
 class ControlManager:
     """Share debug and exit commands between the app and control console."""
 
-    def __init__(self, path: str | Path = "app_control.json") -> None:
-        self.path = Path(path).resolve()
+    def __init__(self, path: str | Path | None = None) -> None:
+        self.path = Path(path).resolve() if path is not None else runtime_file("app_control.json").resolve()
         self._last_debug: bool | None = None
         self._console_process: subprocess.Popen[bytes] | subprocess.Popen[str] | None = None
 
