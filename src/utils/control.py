@@ -17,7 +17,7 @@ from src.utils.logger import log
 class ControlCommand:
     """Current runtime control state."""
 
-    debug: bool = True
+    debug: bool = False
     exit_requested: bool = False
 
 
@@ -27,10 +27,11 @@ class ControlManager:
     def __init__(self, path: str | Path = "app_control.json") -> None:
         self.path = Path(path).resolve()
         self._last_debug: bool | None = None
+        self._console_process: subprocess.Popen[bytes] | subprocess.Popen[str] | None = None
 
     def reset(self) -> None:
         """Reset runtime control state before the monitor starts."""
-        self.write(debug=True, exit_requested=False)
+        self.write(debug=False, exit_requested=False)
 
     def get_debug_mode(self) -> bool:
         """Return current debug setting."""
@@ -45,7 +46,7 @@ class ControlManager:
             return ControlCommand()
 
         return ControlCommand(
-            debug=bool(data.get("debug", True)),
+            debug=bool(data.get("debug", False)),
             exit_requested=bool(data.get("exit_requested", False)),
         )
 
@@ -66,7 +67,7 @@ class ControlManager:
         creationflags = getattr(subprocess, "CREATE_NEW_CONSOLE", 0)
 
         try:
-            subprocess.Popen(
+            self._console_process = subprocess.Popen(
                 args,
                 creationflags=creationflags,
                 cwd=Path(__file__).resolve().parents[2],
@@ -74,6 +75,15 @@ class ControlManager:
             log("Debug control console opened.")
         except OSError as error:
             log(f"Could not open debug control console: {error}")
+
+    def close_console(self) -> None:
+        """Close the separate debug control terminal if this process opened it."""
+        if self._console_process is None:
+            return
+
+        if self._console_process.poll() is None:
+            self._console_process.terminate()
+        self._console_process = None
 
     def _console_args(self) -> list[str]:
         if getattr(sys, "frozen", False):

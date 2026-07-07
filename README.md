@@ -79,6 +79,12 @@ Run:
 python main.py
 ```
 
+On this machine, use the included launcher so the app runs with the compatible Python 3.11 MediaPipe environment:
+
+```powershell
+.\run_app.bat
+```
+
 On first run, the setup wizard creates `config.json`. The wizard asks for OBS connection details, lists OBS inputs, asks you to choose the microphone and camera source, scans local camera indexes, previews the selected camera, and saves the configuration.
 
 `config.json` is a runtime file and is ignored by Git.

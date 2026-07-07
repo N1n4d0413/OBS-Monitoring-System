@@ -58,7 +58,7 @@ def _load_mediapipe_solutions() -> tuple[Any, Any]:
 class PoseDetector:
     """Run camera processing in a daemon thread and track person presence."""
 
-    def __init__(self, config: dict[str, Any], enabled: bool = True, debug: bool = True) -> None:
+    def __init__(self, config: dict[str, Any], enabled: bool = True, debug: bool = False) -> None:
         self.config = config
         self.enabled = enabled
         self.debug = debug
@@ -82,6 +82,8 @@ class PoseDetector:
     def stop(self) -> None:
         """Request the detector thread to stop."""
         self._stop_event.set()
+        self._close_debug_window()
+        cv2.destroyAllWindows()
 
     def set_camera_active(self, active: bool) -> None:
         """Update whether the OBS scene currently has the camera source enabled."""
@@ -155,31 +157,21 @@ class PoseDetector:
                     rgb = cv2.cvtColor(display_frame, cv2.COLOR_BGR2RGB)
                     current_time = time.time()
 
-                    if current_time - self.last_video_check >= 1:
-                        if not self._is_camera_active():
-                            if self.debug:
-                                results = pose.process(rgb)
-                            self.last_video_check = current_time
-                            self._show_debug_frame(
-                                display_frame,
-                                results,
-                                mp_drawing,
-                                mp_pose,
-                                obs_camera_active=False,
-                            )
-                            continue
-
+                    if self._is_debug_enabled():
                         results = pose.process(rgb)
-                        self._update_person_state(results.pose_landmarks is not None)
-                        self.last_video_check = current_time
+                        self._show_debug_frame(display_frame, results, mp_drawing, mp_pose)
 
-                    self._show_debug_frame(
-                        display_frame,
-                        results,
-                        mp_drawing,
-                        mp_pose,
-                        obs_camera_active=self._is_camera_active(),
-                    )
+                        if current_time - self.last_video_check >= 1:
+                            if self._is_camera_active():
+                                self._update_person_state(results.pose_landmarks is not None)
+                            self.last_video_check = current_time
+                        continue
+
+                    if current_time - self.last_video_check >= 1:
+                        if self._is_camera_active():
+                            results = pose.process(rgb)
+                            self._update_person_state(results.pose_landmarks is not None)
+                        self.last_video_check = current_time
 
         except RuntimeError as error:
             log(f"Video monitoring unavailable: {error}")
@@ -193,6 +185,10 @@ class PoseDetector:
     def _is_camera_active(self) -> bool:
         with self._lock:
             return self.camera_active
+
+    def _is_debug_enabled(self) -> bool:
+        with self._lock:
+            return self.debug
 
     def _update_person_state(self, person_present: bool) -> None:
         with self._lock:
@@ -216,9 +212,8 @@ class PoseDetector:
         results: Any,
         mp_drawing: Any,
         mp_pose: Any,
-        obs_camera_active: bool,
     ) -> None:
-        if not self.debug:
+        if not self._is_debug_enabled():
             self._close_debug_window()
             return
 
@@ -231,14 +226,19 @@ class PoseDetector:
                 mp_pose.POSE_CONNECTIONS,
             )
 
-        raw_pose_seen = bool(results and results.pose_landmarks)
-        if obs_camera_active:
-            status_text = "Person Present" if self.get_person_status() else "No Person"
-            color = (0, 255, 0) if self.get_person_status() else (0, 0, 255)
-        else:
-            status_text = "OBS Camera Inactive | Pose Seen" if raw_pose_seen else "OBS Camera Inactive | No Pose"
-            color = (0, 255, 255) if raw_pose_seen else (0, 0, 255)
+        pose_seen = bool(results and results.pose_landmarks)
+        status_text = "MediaPipe: Person Detected" if pose_seen else "MediaPipe: No Person"
+        color = (0, 255, 0) if pose_seen else (0, 0, 255)
 
+        cv2.putText(
+            display_frame,
+            f"OpenCV input: camera index {self.config.get('camera_index')}",
+            (20, 80),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.8,
+            (255, 255, 255),
+            2,
+        )
         cv2.putText(
             display_frame,
             status_text,
@@ -258,6 +258,16 @@ class PoseDetector:
             return
 
         cv2.namedWindow("MediaPipe Lecture Monitor", cv2.WINDOW_NORMAL)
+        cv2.resizeWindow("MediaPipe Lecture Monitor", 960, 540)
+        cv2.moveWindow("MediaPipe Lecture Monitor", 80, 80)
+        try:
+            cv2.setWindowProperty(
+                "MediaPipe Lecture Monitor",
+                cv2.WND_PROP_TOPMOST,
+                1,
+            )
+        except cv2.error:
+            pass
         self._debug_window_open = True
         log("Debug MediaPipe window visible.")
 

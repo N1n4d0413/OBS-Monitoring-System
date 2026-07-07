@@ -72,6 +72,8 @@ class OBSMonitor:
             self.detector.stop()
         finally:
             self.detector.stop()
+            if self.control is not None:
+                self.control.close_console()
 
     def _handle_recording_transition(
         self,
