@@ -1,0 +1,13 @@
+.venv/
+venv/
+obs_env/
+
+__pycache__/
+*.pyc
+
+config.json
+app_control.json
+
+build/
+dist/
+legacy/
