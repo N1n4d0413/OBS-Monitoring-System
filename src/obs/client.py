@@ -91,6 +91,23 @@ class OBSClient:
             return False
         return bool(getattr(status, "output_active", False))
 
+    def is_camera_source_active(self, camera_source: str) -> bool:
+        """Return True when OBS reports the camera source itself is active."""
+        status = self.safe_call("get_source_active", camera_source)
+        if status is None:
+            return False
+
+        # OBS WebSocket reports whether a video source is active and showing.
+        video_active = getattr(status, "video_active", None)
+        if video_active is not None:
+            return bool(video_active)
+
+        source_active = getattr(status, "source_active", None)
+        if source_active is not None:
+            return bool(source_active)
+
+        return False
+
     def is_camera_enabled(self, camera_source: str) -> bool:
         """Return True when the configured source is enabled in the program scene."""
         try:

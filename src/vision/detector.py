@@ -82,8 +82,8 @@ class PoseDetector:
     def stop(self) -> None:
         """Request the detector thread to stop."""
         self._stop_event.set()
-        self._close_debug_window()
-        cv2.destroyAllWindows()
+        if self._thread and self._thread.is_alive() and threading.current_thread() is not self._thread:
+            self._thread.join(timeout=3)
 
     def set_camera_active(self, active: bool) -> None:
         """Update whether the OBS scene currently has the camera source enabled."""
@@ -101,7 +101,7 @@ class PoseDetector:
 
             self.person_present = False
             self.previous_person_state = False
-            log("VIDEO: Person not detected because OBS camera output is inactive.")
+            log("VIDEO: Person detection paused because OBS camera output is inactive.")
 
     def set_debug(self, enabled: bool) -> None:
         """Turn the OpenCV debug preview window on or off."""
@@ -181,6 +181,7 @@ class PoseDetector:
             if "cap" in locals():
                 cap.release()
             cv2.destroyAllWindows()
+            self._debug_window_open = False
 
     def _is_camera_active(self) -> bool:
         with self._lock:

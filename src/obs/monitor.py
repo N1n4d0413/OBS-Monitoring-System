@@ -29,6 +29,7 @@ class OBSMonitor:
         self.control = control
         self.previous_recording_state = False
         self.previous_camera_source_state: bool | None = None
+        self.previous_camera_device_state: bool | None = None
         self.previous_virtual_camera_state: bool | None = None
 
     def run(self) -> None:
@@ -41,10 +42,15 @@ class OBSMonitor:
                     break
 
                 camera_source_enabled = self.obs.is_camera_enabled(self.config["camera_source"])
+                camera_device_active = self.obs.is_camera_source_active(self.config["camera_source"])
                 virtual_camera_active = self.obs.is_virtual_camera_active()
-                self._log_camera_state(camera_source_enabled, virtual_camera_active)
+                self._log_camera_state(
+                    camera_source_enabled,
+                    camera_device_active,
+                    virtual_camera_active,
+                )
 
-                camera_active = camera_source_enabled and virtual_camera_active
+                camera_active = camera_source_enabled and camera_device_active and virtual_camera_active
                 self.detector.set_camera_active(camera_active)
 
                 record_status = self.obs.get_record_status()
@@ -58,12 +64,14 @@ class OBSMonitor:
 
                 if not is_recording:
                     self.previous_recording_state = is_recording
-                    time.sleep(self.CHECK_INTERVAL)
+                    if self._wait_for_next_check():
+                        break
                     continue
 
                 self.audio.check(camera_active, self.detector.get_person_status(), current_time)
                 self.previous_recording_state = is_recording
-                time.sleep(self.CHECK_INTERVAL)
+                if self._wait_for_next_check():
+                    break
         except KeyboardInterrupt:
             log("Shutting down safely...")
             self.detector.stop()
@@ -107,11 +115,30 @@ class OBSMonitor:
 
         return False
 
-    def _log_camera_state(self, camera_source_enabled: bool, virtual_camera_active: bool) -> None:
+    def _wait_for_next_check(self) -> bool:
+        """Sleep in short steps so debug-console exit can stop the app quickly."""
+        deadline = time.time() + self.CHECK_INTERVAL
+        while time.time() < deadline:
+            if self._apply_control_commands():
+                return True
+            time.sleep(0.1)
+        return False
+
+    def _log_camera_state(
+        self,
+        camera_source_enabled: bool,
+        camera_device_active: bool,
+        virtual_camera_active: bool,
+    ) -> None:
         if camera_source_enabled != self.previous_camera_source_state:
             state = "enabled" if camera_source_enabled else "disabled"
-            log(f"OBS camera source is {state}.")
+            log(f"OBS camera source visibility is {state}.")
             self.previous_camera_source_state = camera_source_enabled
+
+        if camera_device_active != self.previous_camera_device_state:
+            state = "active" if camera_device_active else "inactive"
+            log(f"OBS camera capture device is {state}.")
+            self.previous_camera_device_state = camera_device_active
 
         if virtual_camera_active != self.previous_virtual_camera_state:
             state = "active" if virtual_camera_active else "inactive"
